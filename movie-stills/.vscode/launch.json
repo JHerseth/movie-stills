@@ -1,0 +1,16 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["--file=/mnt/g/Movies/Aguirre,\ the\ Wrath\ of\ God\ \(1972\)/Aguirre.The.Wrath.Of.God.1972.1080p.BluRay.x264.mp4", "-output=3/"],
+            "console": "integratedTerminal"
+        }
+    ]
+}''
