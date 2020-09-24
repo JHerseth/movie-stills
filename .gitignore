@@ -3,3 +3,4 @@ jcher.egg-info
 dist
 build
 movie-stills/.vscode
+.python-version
