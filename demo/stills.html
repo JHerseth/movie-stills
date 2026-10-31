@@ -1,0 +1,189 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>STILLS · a 16k intro</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+#m{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#d8cfbf;font:13px/3 monospace;letter-spacing:.3em;cursor:pointer;user-select:none}
+#m b{font:300 54px Georgia,serif;letter-spacing:.5em;margin-left:.5em}
+</style></head><body><canvas id="c"></canvas><div id="m"><b>STILLS</b><span id="s">synthesizing…</span></div>
+<script>
+// ═════════ STILLS — a 16k intro. Everything (music + visuals) is generated at runtime. ═════════
+
+// ───────── music: a tiny offline synth rendering the whole song into an AudioBuffer ─────────
+const SR=44100,ST=60/125/4,BAR=ST*16,NB=48,LEN=(NB*BAR+6)*SR|0,
+ Lb=new Float32Array(LEN),Rb=new Float32Array(LEN),
+ E=Math.exp,S=Math.sin,mn=Math.min,TAU=Math.PI*2,rn=()=>Math.random()*2-1,mf=n=>440*2**((n-69)/12);
+function add(t0,d,g,p,f){let s=t0*SR|0,n=mn(d*SR|0,LEN-s),a=g*mn(1,1-p),b=g*mn(1,1+p);
+ for(let i=0;i<n;i++){let v=f(i/SR);Lb[s+i]+=v*a;Rb[s+i]+=v*b}}
+// ping-pong echo: re-render the note 3 sixteenths later, quieter, other side
+function echo(t0,d,g,p,mk,n){for(let k=0;k<n;k++)add(t0+k*ST*3,d,g*.45**k,k%2?-p:p,mk())}
+const kick=()=>t=>Math.tanh(S(TAU*(48*t+5*(1-E(-30*t))))*E(-t*7)*2),
+ snare=()=>t=>rn()*E(-t*14)*.6+S(TAU*185*t)*E(-t*30)*.6,
+ hat=()=>{let o=0;return t=>{let r=rn(),v=r-o;o=r;return v*E(-t*45)}},
+ bass=(n,d)=>{let l=0,f=mf(n);return t=>(l+=(2*(t*f%1)-1-l)*(.04+.3*E(-t*12)))*mn(1,t*300,(d-t)*50)},
+ pad=(n,d)=>{let l=0,f=mf(n);return t=>(l+=((t*f*.996%1)+(t*f%1)+(t*f*1.004%1)-1.5-l)*(.035+.02*S(t*1.7)))*mn(1,t/.6,(d-t)/.7)},
+ arp=n=>{let l=0,f=mf(n);return t=>(l+=((t*f%1<.3?1:-1)-l)*.25)*E(-t*10)*mn(1,t*400)},
+ lead=(n,d)=>{let l=0,f=mf(n),a=0,b=0;return t=>{let v=f*(1+.007*S(t*34)*mn(1,t*3));a+=v/SR;b+=v*1.006/SR;
+  return(l+=(a%1+b%1-1-l)*.12)*mn(1,t*60,(d-t)*20)*(.7+.3*E(-t*4))}},
+ CH=[[57,60,64],[57,60,65],[55,60,64],[55,59,62]],BS=[33,29,36,31],   // Am F C G
+ MEL=[0,76,4,4,74,2,6,72,2,8,76,3,11,81,3,14,79,2,16,77,4,20,76,2,22,72,2,24,69,6,30,72,2,
+  32,79,4,36,76,2,38,72,2,40,76,3,43,79,3,46,84,2,48,83,4,52,81,2,54,79,2,56,74,8];
+function gen(){
+ for(let b=0;b<NB;b++){
+  const t=b*BAR,c=b%4,ch=CH[c],dr=b>=8&&b<24||b>=32&&b<44,hh=b>=4&&b<44&&(b<24||b>=28),pd=b==NB-1?BAR*3:BAR+.7;
+  ch.forEach((n,i)=>add(t,pd,.2,(i-1)*.5,pad(n,pd)));
+  if(b<8){for(let i=0;i<BAR*24;i++)add(t+i/24,.03,.04,.3,hat());add(t,.12,.1,0,u=>S(TAU*1e3*u))} // projector + leader beep
+  for(let s=0;s<16;s++){const ts=t+s*ST;
+   if(dr&&s%4==0)add(ts,.4,.4,0,kick());
+   if(dr&&b>=16&&s%8==4)add(ts,.3,.4,.1,snare());
+   if(hh&&s%4==2)add(ts,.1,.25,-.3,hat());
+   if(hh&&dr&&b>=16&&s%2)add(ts,.05,.1,.3,hat());
+   if(dr&&[0,2,3,6,8,10,11,14].includes(s)){let d=ST*1.6;add(ts,d,.32,0,bass(BS[c]+(s%8==3?12:0),d))}
+   if(b>=16&&b<44)echo(ts,.25,.1,.5,()=>arp(ch[s%3]+12+(s&4?12:0)),3);
+   if(b==31)add(ts,.2,.05+s*.025,0,snare());
+  }
+  if(b>=32&&b<44)for(let i=0;i<MEL.length;i+=3)if(MEL[i]>>4==c){let d=MEL[i+2]*ST;echo(t+MEL[i]%16*ST,d,.18,.3,()=>lead(MEL[i+1]-12,d),3)}
+ }
+ let m=0;for(let i=0;i<LEN;i++)m=Math.max(m,Math.abs(Lb[i]),Math.abs(Rb[i]));
+ for(let i=0;i<LEN;i++){Lb[i]=Math.tanh(Lb[i]*1.5/m)*.9;Rb[i]=Math.tanh(Rb[i]*1.5/m)*.9}
+}
+
+// ───────── shaders ─────────
+const HS='precision highp float;float h(vec2 p){vec3 q=fract(p.xyx*.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}',
+SCENE=HS+`uniform vec2 R;uniform float T,F,B,S,P;
+#define PI 3.14159265
+float M,TR,I,GL;
+mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,s,-s,c);}
+float smin(float a,float b,float k){float x=clamp(.5+.5*(b-a)/k,0.,1.);return mix(b,a,x)-k*x*(1.-x);}
+float box(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.);}
+vec3 still(vec2 q,float id){float a=h(vec2(id,7.)),b=h(vec2(id,3.));
+ vec3 c=mix(vec3(1.,.55,.25),vec3(.2,.1,.4),clamp(q.y*1.8+.4,0.,1.));if(a>.6)c=c.zyx;
+ vec2 s=q-vec2(b*.6-.3,.06);c=mix(c+vec3(1.,.5,.2)*.3*exp(-length(s)*5.),vec3(1.,.85,.6),1.-smoothstep(.1,.11,length(s)));
+ c=mix(c,vec3(.06,.03,.07),step(q.y,-.1+.05*sin(q.x*7.+a*40.)+.02*sin(q.x*23.+b*9.)));
+ return mix(c,vec3(0),step(q.y,-.25+.04*sin(q.x*13.+b*30.)));}
+vec3 leader(vec2 u){float r=length(u),a=fract(atan(u.x,u.y)/PI*.5),l=min(min(abs(r-.6),abs(r-.7)),min(abs(u.x),abs(u.y)));
+ return vec3(.8,.75,.65)*(a<fract(P)?.55:1.)*(.15+.85*smoothstep(0.,.008,l))*(1.-.4*smoothstep(.7,1.4,r));}
+vec3 tunnel(vec2 u){u+=.15*vec2(sin(T*.7),cos(T*.6));u*=rot(T*.15);
+ float r=length(u),a=atan(u.y,u.x)/PI*2.,z=.4/r+T*1.2,s=fract(a),e=min(s,1.-s);
+ vec3 c=vec3(.04,.03,.02);
+ c=mix(c,vec3(.85,.8,.7),step(abs(e-.07),.03)*step(abs(fract(z*4.)-.5),.2));
+ vec2 q=vec2((s-.5)/.66,(fract(z)-.5)/.9);
+ if(abs(q.x)<.5&&abs(q.y)<.5)c=still(q,floor(z)*4.+floor(a))*(1.-.8*dot(q,q));
+ return c*smoothstep(0.,.5,r)*(1.+B*.4);}
+float m2(vec3 p){float d=1e3;
+ for(int i=0;i<6;i++){float f=float(i);d=smin(d,length(p-vec3(sin(T*.6+f*1.05)*1.8,-.3+abs(sin(T*6.545+f*1.571))*1.3,cos(T*.45+f*2.1)*1.8))-.5,.6);}
+ float g=p.y+.8;M=g<d?1.:2.;return min(d,g);}
+float m3(vec3 p){p*=.5;float s=2.;TR=1e3;
+ for(int i=0;i<5;i++){p=abs(p);if(p.x<p.y)p.xy=p.yx;if(p.x<p.z)p.xz=p.zx;if(p.y<p.z)p.yz=p.zy;
+  p=p*3.-2.;if(p.z<-1.)p.z+=2.;s*=3.;p.xy*=rot(.15*sin(T*.21));p.xz*=rot(.1*cos(T*.17));TR=min(TR,dot(p,p));}
+ return box(p,vec3(1.))/s;}
+float m4(vec3 p){p.xy*=rot(p.z*.07);vec3 q=p;q.z=mod(q.z,4.)-2.;TR=floor(p.z/4.);
+ return min(max(box(q,vec3(2.2,2.2,.12)),-box(q,vec3(1.8,1.8,1.))),length(abs(p.xy)-2.)-.06);}
+float map(vec3 p){return S<2.5?m2(p):S<3.5?m3(p):m4(p);}
+float march(vec3 ro,vec3 rd){float t=0.;GL=0.;I=0.;
+ for(int i=0;i<120;i++){float d=map(ro+rd*t);GL+=exp(-d*5.);if(d<.0007*t+.0005||t>40.)break;t+=d*.9;I+=1.;}return t;}
+vec3 nrm(vec3 p){vec2 e=vec2(.002,0);return normalize(vec3(map(p+e.xyy)-map(p-e.xyy),map(p+e.yxy)-map(p-e.yxy),map(p+e.yyx)-map(p-e.yyx)));}
+float sha(vec3 ro,vec3 rd){float r=1.,t=.05;for(int i=0;i<28;i++){float d=map(ro+rd*t);r=min(r,8.*d/t);t+=clamp(d,.03,.6);if(d<.001||t>12.)break;}return clamp(r,0.,1.);}
+vec3 sky(vec3 d){return mix(vec3(1.,.55,.3),vec3(.12,.1,.35),sqrt(clamp(d.y+.05,0.,1.)))+vec3(1.,.6,.3)*pow(max(dot(d,normalize(vec3(.2,.15,-1.))),0.),20.);}
+vec3 sc2(vec3 ro,vec3 rd){vec3 c=vec3(0),k=vec3(1),L=normalize(vec3(.2,.35,-1.));
+ for(int b=0;b<2;b++){float t=march(ro,rd);if(t>40.){c+=k*sky(rd);k*=0.;break;}
+  float m=M;vec3 p=ro+rd*t,n=nrm(p),a;float df=max(dot(n,L),0.)*sha(p+n*.01,L),fg=exp(-t*.05),rf;
+  if(m<1.5){a=vec3(.6,.55,.5)*(.25+.75*mod(floor(p.x)+floor(p.z),2.));rf=.25;}else{a=vec3(.04);rf=.9;}
+  vec3 s=a*(df*vec3(1.6,1.1,.7)+vec3(.12,.12,.25))+pow(max(dot(reflect(rd,n),L),0.),60.)*df*2.;
+  c+=k*(1.-rf)*mix(sky(rd),s,fg);k*=rf*fg*vec3(1.,.9,.8);ro=p+n*.01;rd=reflect(rd,n);}
+ return c+k*sky(rd);}
+vec3 sc3(vec3 ro,vec3 rd){float t=march(ro,rd),gl=GL,it=I,tr=TR;vec3 bg=vec3(.02,.02,.05),c=bg,L=normalize(vec3(1,1,-1));
+ if(t<40.){vec3 p=ro+rd*t,n=nrm(p),a=.5+.5*cos(6.28*(tr*.15+T*.02+vec3(0,.1,.25)));float ao=1.-it/120.;
+  c=a*(max(dot(n,L),0.)*vec3(1.,.8,.6)+.25*max(-n.y,0.)*vec3(.3,.5,1.)+.08)*ao*ao+pow(max(dot(reflect(rd,n),L),0.),30.)*.6;
+  c=mix(bg,c,exp(-t*.08));}
+ return c+gl*.0025*vec3(.3,.5,1.)*(1.+B);}
+vec3 sc4(vec3 ro,vec3 rd){float t=march(ro,rd),gl=GL,id=TR;vec3 hu=.5+.5*cos(6.28*(id*.12+vec3(0,.33,.67))),c=vec3(0);
+ if(t<40.){vec3 p=ro+rd*t,n=nrm(p),q=p;q.xy*=rot(q.z*.07);
+  float e=1.-smoothstep(1.8,1.86,max(abs(q.x),abs(q.y)));
+  c=(vec3(.03)+hu*e*(1.5+3.*B)+.3*hu*pow(1.-max(dot(-rd,n),0.),3.))*exp(-t*.07);}
+ return c+gl*.004*hu*(1.+2.*B);}
+void main(){vec2 u=(2.*gl_FragCoord.xy-R)/R.y;vec3 c;
+ if(S<.5)c=leader(u);else if(S<1.5)c=tunnel(u);else if(S>4.5)c=still(u/(R.x/R.y*2.)*(1.-.03*P),6.);
+ else{vec3 ro,ta;
+  if(S<2.5){ro=vec3(sin(T*.2)*5.5,.8+.4*sin(T*.3),cos(T*.2)*5.5);ta=vec3(0);}
+  else if(S<3.5){float a=T*.07,d=6.5-P*.3;ro=vec3(sin(a)*d,1.5*sin(T*.05),cos(a)*d);ta=vec3(0);}
+  else{ro=vec3(.3*sin(T*.5),.3*cos(T*.4),T*5.);ta=ro+vec3(0,0,1);u*=rot(sin(T*.3)*.3);}
+  vec3 w=normalize(ta-ro),r=normalize(cross(w,vec3(0,1,0))),rd=normalize(u.x*r+u.y*cross(r,w)+1.8*w);
+  c=pow(max(S<2.5?sc2(ro,rd):S<3.5?sc3(ro,rd):sc4(ro,rd),0.),vec3(.4545));}
+ gl_FragColor=vec4(c,1);}`,
+// post: chromatic aberration, text layer, film burn, grain, flicker, scratches, dust, vignette, letterbox
+POST=HS+`uniform sampler2D A,X;uniform vec2 R;uniform float T,B,D,K,L,G;
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+1.),f.x),f.y);}
+void main(){vec2 v=gl_FragCoord.xy/R,uv=v,a=vec2(R.x/R.y,1.);float fr=floor(T*24.);
+ uv.y+=(h(vec2(fr,1.))-.5)*.003;
+ vec2 o=(uv-.5)*(.004+B*.012);
+ vec3 c=vec3(texture2D(A,uv-o).r,texture2D(A,uv).g,texture2D(A,uv+o).b);
+ vec4 t=texture2D(X,uv);c=mix(c,t.rgb,t.a)+L;
+ if(K>0.){float d=n(uv*a*4.)*.5+n(uv*a*9.)*.25+.4*(1.-length(uv-.5)*1.4)-1.15+K*1.25;
+  c*=1.-.8*smoothstep(-.2,-.02,d);c=mix(c,vec3(1.5,.6,.1),smoothstep(-.04,0.,d));c=mix(c,vec3(1,.97,.9),smoothstep(0.,.06,d));}
+ c+=(h(gl_FragCoord.xy+mod(fr,64.)*91.7)-.5)*G;
+ c*=.94+.06*h(vec2(fr,7.));
+ if(h(vec2(fr,5.))>.6)c*=1.-.5*(1.-smoothstep(0.,.002,abs(v.x-h(vec2(fr,3.)))));
+ if(h(vec2(fr,17.))>.7)c*=1.-.8*(1.-smoothstep(.003,.006,length((v-vec2(h(vec2(fr,11.)),h(vec2(fr,13.))))*a)));
+ c*=1.-.6*pow(length(v-.5)*1.3,3.);
+ float bh=max(0.,(1.-a.x/2.39)*.5);if(v.y<bh||v.y>1.-bh)c=vec3(0);
+ gl_FragColor=vec4(c*D,1);}`;
+
+// ───────── WebGL plumbing ─────────
+const C=document.getElementById('c'),g=C.getContext('webgl'),X=document.createElement('canvas'),x=X.getContext('2d'),
+ m=document.getElementById('m'),st=document.getElementById('s');
+function pr(fs){const p=g.createProgram();
+ [['attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}',g.VERTEX_SHADER],[fs,g.FRAGMENT_SHADER]].forEach(([s,k])=>{
+  const h=g.createShader(k);g.shaderSource(h,s);g.compileShader(h);g.getShaderParameter(h,g.COMPILE_STATUS)||console.error(g.getShaderInfoLog(h));g.attachShader(p,h)});
+ g.bindAttribLocation(p,0,'p');g.linkProgram(p);p.u={};return p}
+const U=(p,n,...v)=>g['uniform'+v.length+'f'](p.u[n]??=g.getUniformLocation(p,n),...v);
+function tex(){const t=g.createTexture();g.bindTexture(g.TEXTURE_2D,t);
+ for(const k of[g.TEXTURE_MIN_FILTER,g.TEXTURE_MAG_FILTER])g.texParameteri(g.TEXTURE_2D,k,g.LINEAR);
+ for(const k of[g.TEXTURE_WRAP_S,g.TEXTURE_WRAP_T])g.texParameteri(g.TEXTURE_2D,k,g.CLAMP_TO_EDGE);return t}
+let P1,P2,TA,TX,FB,W,H,RW,RH,TW,TH,ac,bf,t0=null,ready=0,OFF=+location.hash.slice(1)||0;
+if(g){P1=pr(SCENE);P2=pr(POST);g.useProgram(P2);g.uniform1i(g.getUniformLocation(P2,'X'),1);
+ g.bindBuffer(g.ARRAY_BUFFER,g.createBuffer());g.bufferData(g.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),g.STATIC_DRAW);
+ g.enableVertexAttribArray(0);g.vertexAttribPointer(0,2,g.FLOAT,0,0,0);TA=tex();TX=tex();FB=g.createFramebuffer()}
+function rs(){const d=mn(devicePixelRatio,2);W=C.width=innerWidth*d|0;H=C.height=innerHeight*d|0;
+ const k=mn(1,1280/W);RW=W*k|0;RH=H*k|0;
+ g.bindTexture(g.TEXTURE_2D,TA);g.texImage2D(g.TEXTURE_2D,0,g.RGBA,RW,RH,0,g.RGBA,g.UNSIGNED_BYTE,null);
+ g.bindFramebuffer(g.FRAMEBUFFER,FB);g.framebufferTexture2D(g.FRAMEBUFFER,g.COLOR_ATTACHMENT0,g.TEXTURE_2D,TA,0);g.bindFramebuffer(g.FRAMEBUFFER,null);
+ TW=X.width=mn(W,1280);TH=X.height=TW*H/W|0}
+g&&(onresize=rs)();
+
+// ───────── text layer ─────────
+const GR='GREETINGS FLY OUT TO ALL SCENERS · PIXEL PUSHERS · TRACKER HEADS · SHADER WIZARDS · CINEPHILES · PROJECTIONISTS · AND YOU, FOR WATCHING TO THE END ·';
+const cl=v=>Math.max(0,mn(1,v)),win=(f,a,b)=>cl(mn(f-a,b-f)/.4);
+function tx(s,y,z,a,f='300 #px Georgia,serif',c='#eee'){if(a<=0)return;x.globalAlpha=a;x.font=f.replace('#',z*TH|0);x.fillStyle=c;x.fillText(s,TW/2,y*TH)}
+function text(s,P,t){x.clearRect(0,0,TW,TH);x.textAlign='center';x.textBaseline='middle';x.shadowColor='#000';x.shadowBlur=TH*.02;
+ const yl=1-Math.max(0,(1-TW/TH/2.39)/2)-.09;
+ if(s==0){x.shadowBlur=0;tx(8-(P|0),.5,.42,1,'bold #px Georgia,serif','#1a1814')}
+ if(s==1){tx('a sixteen kilobyte intro',.5,.04,win(P,.3,2.3));tx('S T I L L S',.5,.17,win(P,2.5,5.6));tx('code · synth · shaders · 16384 bytes',.5,.035,win(P,6,7.9),'#px monospace')}
+ if(s==2){tx('no textures · no samples · no libraries',yl,.035,win(P,1,4),'#px monospace');tx('just maths, sixty times a second',yl,.035,win(P,4.5,7.5),'#px monospace')}
+ if(s==3){tx('every frame is a still',.5,.06,win(P,1.5,4.5),'italic 300 #px Georgia,serif');tx('every still, a world',.5,.06,win(P,4.6,7.6),'italic 300 #px Georgia,serif')}
+ if(s==4){const z=TH*.075,cw=z*.62;x.font='bold '+(z|0)+'px monospace';x.globalAlpha=cl(P*2);
+  for(let i=0;i<GR.length;i++){const X0=TW+i*cw-P*BAR*TH*.34;if(X0<-cw||X0>TW+cw)continue;
+   x.fillStyle=`hsl(${X0*.3+t*90},90%,65%)`;x.fillText(GR[i],X0,TH*(.5+.13*S(X0*.008+t*2.5)))}}
+ if(s==5){tx('THE END',.47,.12,win(P,.4,3.3));tx('movie-stills · 2026',.6,.03,win(P,1,3.3),'#px monospace')}
+ x.globalAlpha=1}
+
+// ───────── main loop: everything syncs to the audio clock ─────────
+const SC=[0,8,16,24,32,44,99];
+function frame(){requestAnimationFrame(frame);if(t0==null||!g)return;
+ const t=ac.currentTime-t0,f=t/BAR;let s=0;while(f>=SC[s+1])s++;const P=f-SC[s];
+ if(f>49.6){t0=null;m.style.display='';st.textContent='fin · click to watch again';OFF=0;g.clearColor(0,0,0,1);g.clear(g.COLOR_BUFFER_BIT);return}
+ const B=f>=8&&f<24||f>=32&&f<44?E(-(f*4%1)*5):0;
+ g.bindFramebuffer(g.FRAMEBUFFER,FB);g.viewport(0,0,RW,RH);g.useProgram(P1);
+ U(P1,'R',RW,RH);U(P1,'T',t);U(P1,'F',f);U(P1,'B',B);U(P1,'S',s);U(P1,'P',P);g.drawArrays(g.TRIANGLES,0,3);
+ text(s,P,t);
+ g.bindFramebuffer(g.FRAMEBUFFER,null);g.viewport(0,0,W,H);g.useProgram(P2);
+ g.activeTexture(g.TEXTURE1);g.bindTexture(g.TEXTURE_2D,TX);g.pixelStorei(g.UNPACK_FLIP_Y_WEBGL,1);
+ g.texImage2D(g.TEXTURE_2D,0,g.RGBA,g.RGBA,g.UNSIGNED_BYTE,X);g.activeTexture(g.TEXTURE0);g.bindTexture(g.TEXTURE_2D,TA);
+ U(P2,'R',W,H);U(P2,'T',t);U(P2,'B',B);U(P2,'G',s?.07:.22);U(P2,'L',s&&s<5?E(-P*BAR*5)*.7:0);
+ U(P2,'K',s==5?cl((P-2.9)/1.4):0);U(P2,'D',cl(f*2)*cl((49.4-f)/1.2));g.drawArrays(g.TRIANGLES,0,3)}
+
+m.onclick=()=>{if(!ready)return;m.style.display='none';document.documentElement.requestFullscreen?.().catch(()=>{});
+ ac??=new AudioContext();if(!bf){bf=ac.createBuffer(2,LEN,SR);bf.getChannelData(0).set(Lb);bf.getChannelData(1).set(Rb)}
+ ac.resume();const src=ac.createBufferSource();src.buffer=bf;src.connect(ac.destination);src.start(0,OFF);t0=ac.currentTime-OFF};
+setTimeout(()=>{if(!g){st.textContent='WebGL not available';return}gen();ready=1;st.textContent='click to start · best in fullscreen with sound'},50);
+requestAnimationFrame(frame);
+</script></body></html>
