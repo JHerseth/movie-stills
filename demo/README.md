@@ -71,3 +71,31 @@ The synth includes a tonewheel-organ wavetable with a rotating-speaker wobble, M
 strings and flute with tape wobble, a monophonic Moog-style lead that glides between notes through a resonant filter,
 plucked-string synthesis for the twelve-string, drums, toms and a gong, plus a reverb. The Moog solo in the
 finale is improvised by a random walk over the D major scale, so it's different every time.
+
+---
+
+# Clockwork Sky — full version (4:25)
+
+Movement ii of *The Cartographer's Dream*, expanded into a full prog song: [`clockwork-sky/clockwork-sky.mp3`](clockwork-sky/clockwork-sky.mp3).
+Like the intros, it uses no samples. `clockwork-sky/render.js` synthesizes every note and writes the WAV/MP3 (`node render.js`, about 15 s; MP3 needs ffmpeg).
+
+The pulse stays fixed (eighth note = 0.2 s) while the meter shifts between 7/8 (2+2+3) and 4/4.
+
+| time | section |
+|------|---------|
+| 0:00 | intro: a clock ticking in 2+2+3, music box plays the theme, strings and organ swell |
+| 0:17 | main riff: Hammond stabs, bass riff, drums |
+| 0:39 | theme on Moog; second time with organ harmony |
+| 1:02 | riff with organ answers |
+| 1:13 | bridge in 4/4 (Gm–Bb–C–A): flute, then Moog |
+| 1:38 | riff modulates up to E minor, then back to D |
+| 2:01 | quiet interlude: twelve-string arpeggios, ticking, music box |
+| 2:23 | unison run: organ, bass and Moog in 16th notes, ending on three hits and a gap |
+| 2:34 | Moog solo over the riff (ride cymbal) |
+| 3:08 | Hammond solo |
+| 3:30 | theme returns with string harmony |
+| 3:53 | half-time 4/4 coda turning to D major, final chord with gong |
+| 4:12 | the clock slows down and stops; the music box plays the riff one last time |
+
+The solos come from a small improviser: it picks rhythm cells, aims for chord tones on the downbeats and gets denser as the
+solo goes on. Its random numbers are seeded, so every render produces the same song.

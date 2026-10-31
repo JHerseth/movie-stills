@@ -4,3 +4,4 @@ dist
 build
 movie-stills/.vscode
 .python-version
+demo/clockwork-sky/*.wav
