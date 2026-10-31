@@ -62,7 +62,7 @@ It's framed as side one of an LP. The needle drops onto a spinning record, then 
 |------|----------|-------|---------|
 | 0:00 | needle drop | vinyl crackle | a spinning record, label text turning with it |
 | 0:06 | i. the gathering mist | 4/4 at 80 BPM: Mellotron strings, flute melody, gong | sunrise over a sea of cloud with floating islands |
-| 0:27 | ii. clockwork sky | 7/8 (2+2+3): Hammond organ stabs, bass riff, Moog lead | a brass orrery whose rings tick round on the off-beat accents |
+| 0:27 | ii. clockwork sky | 7/8 (2+2+3): Hammond organ stabs, bass riff, Moog lead | a brass orrery whose rings tick round on the accents of the riff |
 | 0:55 | iii. glass cathedral | 5/4: twelve-string guitar arpeggios, flute | a stained-glass rose window; panes light up with each note |
 | 1:19 | iv. ascension | 7/8 reprise into a 4/4 finale with a Moog solo, ending on a big D major chord | flying among the islands under a ringed planet, fading to white |
 | 1:48 | run-out groove | crackle, the needle clicking every turn | "side one ends · please turn over" |
